@@ -1,0 +1,15 @@
+#!/usr/bin/env sh
+
+# Enforce single package manager (Yarn)
+node scripts/enforce-package-manager.js || exit 1
+
+echo "Building the project before pushing..."
+yarn build
+
+echo "Compiling OpenAPI Docs..."
+yarn openapi
+
+echo "You are clear"
+# Run linters and formatters on staged files
+yarn format
+yarn lint-staged

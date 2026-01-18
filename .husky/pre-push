@@ -1,0 +1,20 @@
+#!/usr/bin/env sh
+
+block=false
+while read local_ref local_sha remote_ref remote_sha; do
+    if [ "$remote_ref" = "refs/heads/master" ]; then
+        block=true
+    fi
+    if [ "$remote_ref" = "refs/heads/staging" ]; then
+        block=true
+    fi
+
+done
+
+if [ "$block" = true ]; then
+    echo "Direct pushes to these branches are disabled. Create a PR instead."
+    exit 1
+fi
+
+
+exit 0

@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+
+# Enforce conventional commit messages
+yarn commitlint --edit "$1"
+

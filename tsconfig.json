@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "declaration": false,
+    "noUncheckedIndexedAccess": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "es2019",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "skipLibCheck": true,
+    "moduleResolution": "node",
+    "strictNullChecks": true,
+    "noImplicitAny": false,
+    "paths": {
+      "*": ["node_modules/*"],
+      "@app/*": ["src/*"]
+    },
+    "plugins": [
+      {
+        "transform": "@nestia/core/lib/transform",
+        "validate": "validate",
+        "stringify": "assert"
+      },
+      {
+        "transform": "@nestia/sdk/lib/transform"
+      },
+      {
+        "transform": "typia/lib/transform"
+      }
+    ]
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "test", "**/*spec.ts"]
+}
