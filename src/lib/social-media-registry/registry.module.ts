@@ -6,7 +6,6 @@ import { ConnectedAccountsEntity } from "@app/entities/connected-accounts.entity
 import { ContactEntity } from "@app/entities/contact.entity";
 import { ApplicationConfiguration } from "@app/config/app.config";
 import { TelegramConfiguration } from "@app/config/telegram.config";
-import { RedisConfiguration } from "@app/config/redis.config";
 import { ConfigModule, ConfigType } from "@nestjs/config";
 import { TelegramProvider } from "./providers/telegram/telegram.provider";
 import { RegistryService } from "./registry.service";
@@ -54,20 +53,10 @@ import { OutboundMessageActorService } from "../queue/outbound-message-actor.ser
     ConfigModule.forFeature(MfaConfiguration),
     ConfigModule.forFeature(TelegramConfiguration),
     ConfigModule.forFeature(XAPIConfiguration),
-    ConfigModule.forFeature(RedisConfiguration),
     ConfigModule.forFeature(EmailConfiguration),
     ConfigModule.forFeature(MailgunConfiguation),
-    BullModule.forRootAsync({
-      imports: [ConfigModule.forFeature(RedisConfiguration)],
-      inject: [RedisConfiguration.KEY],
-      useFactory: (redisConfig: ConfigType<typeof RedisConfiguration>) => ({
-        connection: {
-          host: redisConfig.host,
-          port: redisConfig.port,
-          password: redisConfig.password,
-          db: redisConfig.db,
-        },
-      }),
+    BullModule.forRoot({
+      connection: process.env.REDIS_URL,
     }),
     BullModule.registerQueue({
       name: QueueName.SocialMediaPoll,
