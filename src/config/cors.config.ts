@@ -15,6 +15,7 @@ export const CorsConfiguration = registerAs("cors", (): CorsConfig => {
       enabled: true,
       origin: [
         /^https?:\/\/(?:[a-z0-9-]+\.)*omni\.sirmapy\.net(?::\d+)?$/i,
+        "https://omni-frontend-aw0z.onrender.com",
       ],
       credentials: true,
       methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
