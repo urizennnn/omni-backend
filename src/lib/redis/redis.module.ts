@@ -32,10 +32,14 @@ import { RedisService } from "./redis.service";
         };
 
         if (config.keyPrefix) baseOptions.keyPrefix = config.keyPrefix;
-        if (config.tls) baseOptions.tls = {};
 
-        const client = config.url
-          ? new Redis(config.url, baseOptions)
+        const url = config.url || process.env.REDIS_URL;
+        if (url?.startsWith("rediss://")) baseOptions.tls = {};
+
+        logger.log(`Redis URL: ${url ? 'present' : 'missing'}`);
+
+        const client = url
+          ? new Redis(url, baseOptions)
           : new Redis({ ...baseOptions, host: config.host, port: config.port, db: config.db, password: config.password });
 
         client.on("connect", () => logger.log("Connected to Redis"));
