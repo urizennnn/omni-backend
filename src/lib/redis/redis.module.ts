@@ -15,19 +15,15 @@ import { RedisService } from "./redis.service";
       useFactory: (config: ConfigType<typeof RedisConfiguration>) => {
         const logger = new Logger("RedisModule");
         let errorLogged = false;
-        const options: RedisOptions = {
-          host: config.host,
-          port: config.port,
-          db: config.db,
+
+        const baseOptions: RedisOptions = {
           lazyConnect: true,
           maxRetriesPerRequest: null,
           showFriendlyErrorStack: false,
           retryStrategy: (times) => {
             const delay = Math.min(times * 1000, 10000);
             if (times === 1 && !errorLogged) {
-              logger.warn(
-                `Redis unavailable at ${config.host}:${config.port}, retrying in background`,
-              );
+              logger.warn("Redis unavailable, retrying in background");
               errorLogged = true;
             }
             return delay;
@@ -35,39 +31,23 @@ import { RedisService } from "./redis.service";
           reconnectOnError: () => true,
         };
 
-        if (config.password) {
-          options.password = config.password;
-        }
-        if (config.keyPrefix) {
-          options.keyPrefix = config.keyPrefix;
-        }
+        if (config.keyPrefix) baseOptions.keyPrefix = config.keyPrefix;
+        if (config.tls) baseOptions.tls = {};
 
-        const client = new Redis(options);
+        const client = config.url
+          ? new Redis(config.url, baseOptions)
+          : new Redis({ ...baseOptions, host: config.host, port: config.port, db: config.db, password: config.password });
 
-        client.on("connect", () => {
-          logger.log(`Connected to Redis at ${config.host}:${config.port}`);
-        });
-
+        client.on("connect", () => logger.log("Connected to Redis"));
         client.on("ready", () => {
-          logger.log("Redis ready to accept commands");
+          logger.log("Redis ready");
           errorLogged = false;
         });
+        client.on("error", () => {});
+        client.on("close", () => logger.warn("Redis connection closed"));
+        client.on("reconnecting", () => {});
 
-        client.on("error", () => {
-          // Suppress error logs - handled in retryStrategy
-        });
-
-        client.on("close", () => {
-          logger.warn("Redis connection closed");
-        });
-
-        client.on("reconnecting", () => {
-          // Silent retry
-        });
-
-        client.connect().catch(() => {
-          // Silent - retryStrategy will handle logging
-        });
+        client.connect().catch(() => {});
 
         return client;
       },
