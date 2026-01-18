@@ -7,6 +7,7 @@ import { ContactEntity } from "@app/entities/contact.entity";
 import { ApplicationConfiguration } from "@app/config/app.config";
 import { TelegramConfiguration } from "@app/config/telegram.config";
 import { ConfigModule, ConfigType } from "@nestjs/config";
+import Redis from "ioredis";
 import { TelegramProvider } from "./providers/telegram/telegram.provider";
 import { RegistryService } from "./registry.service";
 import { MessagingService } from "./messaging.service";
@@ -56,7 +57,10 @@ import { OutboundMessageActorService } from "../queue/outbound-message-actor.ser
     ConfigModule.forFeature(EmailConfiguration),
     ConfigModule.forFeature(MailgunConfiguation),
     BullModule.forRoot({
-      connection: process.env.REDIS_URL,
+      connection: new Redis(process.env.REDIS_URL!, {
+        maxRetriesPerRequest: null,
+        tls: process.env.REDIS_URL?.startsWith("rediss://") ? {} : undefined,
+      }),
     }),
     BullModule.registerQueue({
       name: QueueName.SocialMediaPoll,
