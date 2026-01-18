@@ -1,55 +1,34 @@
 import { Global, Module, Logger } from "@nestjs/common";
-import { ConfigModule, ConfigType } from "@nestjs/config";
 import Redis, { RedisOptions } from "ioredis";
-import { RedisConfiguration } from "@app/config/redis.config";
 import { REDIS_CLIENT } from "./redis.constants";
 import { RedisService } from "./redis.service";
 
 @Global()
 @Module({
-  imports: [ConfigModule.forFeature(RedisConfiguration)],
   providers: [
     {
       provide: REDIS_CLIENT,
-      inject: [RedisConfiguration.KEY],
-      useFactory: (config: ConfigType<typeof RedisConfiguration>) => {
+      useFactory: () => {
         const logger = new Logger("RedisModule");
-        let errorLogged = false;
+        const url = process.env.REDIS_URL;
 
-        const baseOptions: RedisOptions = {
+        if (!url) throw new Error("REDIS_URL env var required");
+
+        const options: RedisOptions = {
           lazyConnect: true,
           maxRetriesPerRequest: null,
-          showFriendlyErrorStack: false,
-          retryStrategy: (times) => {
-            const delay = Math.min(times * 1000, 10000);
-            if (times === 1 && !errorLogged) {
-              logger.warn("Redis unavailable, retrying in background");
-              errorLogged = true;
-            }
-            return delay;
-          },
+          keyPrefix: process.env.REDIS_KEY_PREFIX,
+          tls: url.startsWith("rediss://") ? {} : undefined,
+          retryStrategy: (times) => Math.min(times * 1000, 10000),
           reconnectOnError: () => true,
         };
 
-        if (config.keyPrefix) baseOptions.keyPrefix = config.keyPrefix;
-
-        const url = config.url || process.env.REDIS_URL;
-        if (url?.startsWith("rediss://")) baseOptions.tls = {};
-
-        logger.log(`Redis URL: ${url ? 'present' : 'missing'}`);
-
-        const client = url
-          ? new Redis(url, baseOptions)
-          : new Redis({ ...baseOptions, host: config.host, port: config.port, db: config.db, password: config.password });
+        const client = new Redis(url, options);
 
         client.on("connect", () => logger.log("Connected to Redis"));
-        client.on("ready", () => {
-          logger.log("Redis ready");
-          errorLogged = false;
-        });
-        client.on("error", () => {});
+        client.on("ready", () => logger.log("Redis ready"));
+        client.on("error", (e) => logger.error(`Redis error: ${e.message}`));
         client.on("close", () => logger.warn("Redis connection closed"));
-        client.on("reconnecting", () => {});
 
         client.connect().catch(() => {});
 
