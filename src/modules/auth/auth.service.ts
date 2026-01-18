@@ -196,6 +196,7 @@ export class AuthService {
 
     record.verifiedAt = now;
     user.emailVerifiedAt = now;
+    if (user.status === "pending") user.status = "active";
 
     const em = this.userRepo.getEntityManager();
     em.persist(user);

@@ -55,7 +55,7 @@ export class UserController {
         phoneNumber: user.phoneNumber ?? undefined,
         status: user.status,
         disabled: user.disabled,
-        emailVerifiedAt: user.emailVerifiedAt,
+        emailVerifiedAt: user.emailVerifiedAt ?? undefined,
         platformAccess: user.platformAccess,
         role: user.role,
         createdAt: user.createdAt,
