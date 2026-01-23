@@ -57,9 +57,12 @@ import { OutboundMessageActorService } from "../queue/outbound-message-actor.ser
     ConfigModule.forFeature(EmailConfiguration),
     ConfigModule.forFeature(MailgunConfiguation),
     BullModule.forRoot({
-      connection: new Redis(process.env.REDIS_URL!, {
+      connection: new Redis({
+        host: process.env.REDIS_HOST,
+        port: parseInt(process.env.REDIS_PORT || "6379", 10),
+        username: process.env.REDIS_USERNAME || "default",
+        password: process.env.REDIS_PASSWORD,
         maxRetriesPerRequest: null,
-        tls: process.env.REDIS_URL?.startsWith("rediss://") ? {} : undefined,
       }),
     }),
     BullModule.registerQueue({

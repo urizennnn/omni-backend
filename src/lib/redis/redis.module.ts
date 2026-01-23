@@ -1,37 +1,38 @@
 import { Global, Module, Logger } from "@nestjs/common";
-import Redis, { RedisOptions } from "ioredis";
+import { createClient, RedisClientType } from "redis";
 import { REDIS_CLIENT } from "./redis.constants";
 import { RedisService } from "./redis.service";
+
+export type RedisClient = RedisClientType;
 
 @Global()
 @Module({
   providers: [
     {
       provide: REDIS_CLIENT,
-      useFactory: () => {
+      useFactory: async () => {
         const logger = new Logger("RedisModule");
-        const url = process.env.REDIS_URL;
 
-        if (!url) throw new Error("REDIS_URL env var required");
+        const host = process.env.REDIS_HOST;
+        const port = process.env.REDIS_PORT;
+        if (!host || !port) throw new Error("REDIS_HOST and REDIS_PORT required");
 
-        const options: RedisOptions = {
-          lazyConnect: true,
-          maxRetriesPerRequest: null,
-          keyPrefix: process.env.REDIS_KEY_PREFIX,
-          tls: url.startsWith("rediss://") ? {} : undefined,
-          retryStrategy: (times) => Math.min(times * 1000, 10000),
-          reconnectOnError: () => true,
-        };
-
-        const client = new Redis(url, options);
+        const client = createClient({
+          username: process.env.REDIS_USERNAME || "default",
+          password: process.env.REDIS_PASSWORD,
+          socket: {
+            host,
+            port: parseInt(port, 10),
+            reconnectStrategy: (retries) => Math.min(retries * 1000, 10000),
+          },
+        });
 
         client.on("connect", () => logger.log("Connected to Redis"));
         client.on("ready", () => logger.log("Redis ready"));
         client.on("error", (e) => logger.error(`Redis error: ${e.message}`));
-        client.on("close", () => logger.warn("Redis connection closed"));
+        client.on("end", () => logger.warn("Redis connection closed"));
 
-        client.connect().catch(() => {});
-
+        await client.connect();
         return client;
       },
     },

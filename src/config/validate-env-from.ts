@@ -16,11 +16,10 @@ const schema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   DB_NAME: z.string().min(1, "DB_NAME is required"),
 
-  REDIS_URL: z.string().startsWith("redis").optional(),
-  REDIS_HOST: z.string().optional().default("127.0.0.1"),
+  REDIS_HOST: z.string().min(1, "REDIS_HOST is required"),
   REDIS_PORT: z.coerce.number().int().positive().default(6379),
+  REDIS_USERNAME: z.string().optional().default("default"),
   REDIS_PASSWORD: z.string().optional(),
-  REDIS_DB: z.coerce.number().int().nonnegative().default(0),
   REDIS_KEY_PREFIX: z.string().optional(),
 
   MAILGUN_SMTP_HOST: z.string().min(1, "MAILGUN_SMTP_HOST is required"),
