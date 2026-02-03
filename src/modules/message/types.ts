@@ -14,11 +14,26 @@ export interface FetchConversationsQuery {
 export interface FetchMessagesQuery {
   conversationId: string;
   threadId?: string;
+  cursor?: string;
+  limit?: number;
+}
+
+export interface PaginatedMessagesResponse {
+  data: any[];
+  nextCursor: string | null;
+  hasMore: boolean;
 }
 
 export interface FetchAllConversationsQuery {
   cursor?: string;
   limit?: number;
+}
+
+export interface AllConversationsResponse {
+  data: ConversationListItem[];
+  nextCursor: string | null;
+  hasMore: boolean;
+  platformCounts: Record<string, number>;
 }
 
 export interface WipeEmailInboxBody {

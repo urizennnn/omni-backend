@@ -49,6 +49,8 @@ export class MessageController {
       query.conversationId,
       userId,
       query.threadId,
+      query.cursor,
+      query.limit,
     );
   }
 

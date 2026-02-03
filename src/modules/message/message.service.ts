@@ -411,6 +411,28 @@ export class MessageService {
     };
   }
 
+  private async getPlatformCounts(
+    isSuperAdmin: boolean,
+    allowedPlatforms: SocialMediaPlatform[],
+  ): Promise<Record<string, number>> {
+    const platforms = isSuperAdmin
+      ? Object.values(SocialMediaPlatform).filter(
+          (p) => p !== SocialMediaPlatform.Email,
+        )
+      : allowedPlatforms.filter((p) => p !== SocialMediaPlatform.Email);
+
+    const counts: Record<string, number> = {};
+
+    await Promise.all(
+      platforms.map(async (platform) => {
+        const count = await this.conversationRepository.count({ platform });
+        counts[platform] = count;
+      }),
+    );
+
+    return counts;
+  }
+
   async fetchAllConversationsPaginated(
     userId: string,
     cursor?: string,
@@ -419,6 +441,7 @@ export class MessageService {
     data: ConversationListItem[];
     nextCursor: string | null;
     hasMore: boolean;
+    platformCounts: Record<string, number>;
   }> {
     const user = await this.userRepository.findOne(
       { id: userId },
@@ -431,8 +454,8 @@ export class MessageService {
     const isSuperAdmin = user.role.name === "super-admin";
     let whereClause: any = {};
 
+    let allowedPlatforms: SocialMediaPlatform[] = [];
     if (!isSuperAdmin) {
-      const allowedPlatforms: SocialMediaPlatform[] = [];
       if (user.platformAccess && user.platformAccess.length > 0) {
         for (const access of user.platformAccess) {
           if (access.viewMessages) {
@@ -445,7 +468,12 @@ export class MessageService {
         this.logger.warn(
           `User ${userId} has no platforms with viewMessages permission`,
         );
-        return { data: [], nextCursor: null, hasMore: false };
+        return {
+          data: [],
+          nextCursor: null,
+          hasMore: false,
+          platformCounts: {},
+        };
       }
 
       const eligiblePlatforms = allowedPlatforms.filter(
@@ -456,13 +484,23 @@ export class MessageService {
         this.logger.warn(
           `User ${userId} has no eligible platforms for conversations/all`,
         );
-        return { data: [], nextCursor: null, hasMore: false };
+        return {
+          data: [],
+          nextCursor: null,
+          hasMore: false,
+          platformCounts: {},
+        };
       }
 
       whereClause.platform = { $in: eligiblePlatforms };
     } else {
       whereClause.platform = { $ne: SocialMediaPlatform.Email };
     }
+
+    const platformCounts = await this.getPlatformCounts(
+      isSuperAdmin,
+      allowedPlatforms,
+    );
 
     if (cursor) {
       const cursorConv = await this.conversationRepository.findOne({
@@ -497,6 +535,7 @@ export class MessageService {
       data: await this.mapConversationsToListItems(data),
       nextCursor,
       hasMore,
+      platformCounts,
     };
   }
 
@@ -721,14 +760,12 @@ export class MessageService {
     conversationId: string,
     userId?: string,
     threadId?: string,
+    cursor?: string,
+    limit: number = 50,
   ) {
-    const conversation = await this.conversationRepository.findOne(
-      { id: conversationId },
-      {
-        populate: ["messages", "messages.sentBy", "messages.sentBy.role"],
-        orderBy: { messages: { createdAt: "DESC" } },
-      },
-    );
+    const conversation = await this.conversationRepository.findOne({
+      id: conversationId,
+    });
 
     if (!conversation) {
       throw new NotFoundException("Conversation not found");
@@ -758,35 +795,34 @@ export class MessageService {
       }
     }
 
-    const messages = conversation.messages.isInitialized()
-      ? conversation.messages.getItems()
-      : [];
+    const whereClause: any = { conversationId };
 
-    const filteredMessages = threadId
-      ? (() => {
-          const threadMessageIds = this.collectThreadMessages(
-            messages,
-            threadId,
-          );
-          return messages.filter((msg) => {
-            if (msg.messageId && threadMessageIds.has(msg.messageId)) {
-              return true;
-            }
-            if (!msg.messageId && msg.threadId === threadId) {
-              return true;
-            }
-            return false;
-          });
-        })()
-      : messages;
+    if (cursor) {
+      const cursorMsg = await this.messageRepository.findOne({ id: cursor });
+      if (cursorMsg) {
+        whereClause.$or = [
+          { createdAt: { $lt: cursorMsg.createdAt } },
+          { createdAt: cursorMsg.createdAt, id: { $lt: cursor } },
+        ];
+      }
+    }
 
-    const sortedMessages = filteredMessages.sort((a, b) => {
-      const aTime = a.sentAt?.getTime() || a.createdAt.getTime();
-      const bTime = b.sentAt?.getTime() || b.createdAt.getTime();
-      return bTime - aTime;
+    if (threadId) {
+      whereClause.threadId = threadId;
+    }
+
+    const messages = await this.messageRepository.findAll({
+      where: whereClause,
+      orderBy: { createdAt: "DESC", id: "DESC" },
+      limit: limit + 1,
+      populate: ["sentBy", "sentBy.role"],
     });
 
-    return sortedMessages.map((msg) => ({
+    const hasMore = messages.length > limit;
+    const data = messages.slice(0, limit);
+    const lastItem = data[data.length - 1];
+
+    const mappedData = data.map((msg) => ({
       id: msg.id,
       externalMessageId: msg.externalMessageId,
       direction: msg.direction,
@@ -816,6 +852,12 @@ export class MessageService {
       externalSenderEmail: msg.externalSenderEmail,
       externalSenderName: msg.externalSenderName,
     }));
+
+    return {
+      data: mappedData,
+      nextCursor: hasMore && lastItem ? lastItem.id : null,
+      hasMore,
+    };
   }
 
   async getLastMessagesForConversation(
